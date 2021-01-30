@@ -1,0 +1,15 @@
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/__init__.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/core_classes.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/core_units.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/__init__.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/drive_reactions.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/mg_reactions.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/__init__.py
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/__pycache__/__init__.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/__pycache__/core_classes.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/__pycache__/core_units.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/core/__pycache__/__init__.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/__pycache__/drive_reactions.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/__pycache__/mg_reactions.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib/standard/__pycache__/__init__.cpython-38.pyc
+/home/richard/.virtualenvs/stdpy/lib/python3.8/site-packages/simple_reactions_lib-1.0-py3.8.egg-info
