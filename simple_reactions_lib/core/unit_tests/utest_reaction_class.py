@@ -1,10 +1,13 @@
 
 import copy
+import itertools as it
 import math
 import unittest
 import unittest.mock as mock
 
+import simple_reactions_lib.core.core_units as unitHelp
 import simple_reactions_lib.core.core_classes as tCode
+
 
 class TestChemSpeciesBase(unittest.TestCase):
 
@@ -156,6 +159,171 @@ class TestReactionController(unittest.TestCase):
 		self.testObjA.callbackFunct = _appendStepNumberToList
 		self.testObjA.doNextNSteps(nSteps)
 		self.assertEqual(expStepList, actStepList)
+
+
+
+class TestNetReactionTemplate(unittest.TestCase):
+
+	def setUp(self):
+		self.reactants = ["X","Y"] 
+		self.products = ["Z"]
+		self.reactantConcs = [2,2]
+		self.productConcs = [2]
+
+		self.timeStep = 2
+		self.temperature = 300
+		self.pH = 0 #Dud argument these days
+		self.potential = 0
+
+		self.barrier = 2
+		self.prefactor = 10
+
+		self.forwardRate = 10
+		self.backwardRate = 15
+
+		self.createTestObjs()
+
+	def createTestObjs(self):
+		#Get input reactants
+		self.inpReactants = list()
+		allSpecies = self.reactants + self.products
+		allConcs = self.reactantConcs + self.productConcs
+		for spec,conc in it.zip_longest(allSpecies,allConcs):
+			self.inpReactants.append( tCode.ChemSpeciesStd(spec,conc) )
+
+
+		self.forwardReaction  = tCode.ChemReactionTemplate(self.reactants, self.products, self.barrier, self.prefactor)
+		self.backwardReaction = tCode.ChemReactionTemplate(self.products, self.reactants, self.barrier, self.prefactor)
+
+
+		#Mock out the get-rate part
+		self.forwardReaction.getReactionRate = mock.Mock()
+		self.backwardReaction.getReactionRate = mock.Mock()
+		self.forwardReaction.getReactionRate.side_effect = lambda *args,**kwargs: self.forwardRate
+		self.backwardReaction.getReactionRate.side_effect = lambda *args,**kwargs: self.backwardRate
+
+		#Create the overall object
+		self.testObjA = tCode.NetReactionTemplate(self.forwardReaction, self.backwardReaction)
+
+	def testGetReactionRate(self):
+		# Setup
+		expRate = self.forwardRate-self.backwardRate
+
+		#run
+		actRate = self.testObjA.getReactionRate(self.inpReactants, self.temperature, pH=self.pH, potential=self.potential)
+
+		#check calls/value
+		self.forwardReaction.getReactionRate.assert_called_with( self.inpReactants, self.temperature, pH=self.pH, potential=self.potential )
+		self.backwardReaction.getReactionRate.assert_called_with( self.inpReactants, self.temperature, pH=self.pH, potential=self.potential )
+		self.assertEqual(expRate, actRate)
+
+	def testGetChangesInReactants(self):
+		#setup
+		netRate = self.forwardRate-self.backwardRate
+		expChanges = {"X": -1*netRate*self.timeStep, "Y": -1*netRate*self.timeStep,
+		              "Z": netRate*self.timeStep}
+		
+		#run. Note forward "reactants" should increase in conc, since netRate is negative
+		actChanges = self.testObjA.getChangesInReactants(self.timeStep, self.inpReactants, self.temperature, pH=self.pH, potential=self.potential)
+
+		self.assertEqual(expChanges, actChanges)
+
+	def testGetChangesInReactants_speciesOnEachSide(self):
+		#We have to do this without redoing sel.createTestObjs; since that specifically assumed no duplication of species
+		self.products.append("X")
+
+		netRate = self.forwardRate-self.backwardRate
+		expChanges = {"X": 0, "Y": -1*netRate*self.timeStep, "Z": netRate*self.timeStep}
+		actChanges = self.testObjA.getChangesInReactants(self.timeStep, self.inpReactants, self.temperature, pH=self.pH, potential=self.potential)
+
+		self.assertEqual(expChanges, actChanges)
+
+	def testGetChangesForRepeatedReactant(self):
+		self.reactants.append("X")
+
+		netRate = self.forwardRate-self.backwardRate
+		expChanges = {"X":-2*netRate*self.timeStep, "Y":-1*netRate*self.timeStep, "Z":netRate*self.timeStep}
+		actChanges = self.testObjA.getChangesInReactants(self.timeStep, self.inpReactants, self.temperature, pH=self.pH, potential=self.potential)
+
+		self.assertEqual(expChanges, actChanges)
+
+
+class TestBetterChemReactionTemplate(unittest.TestCase):
+
+	def setUp(self):
+		self.reactants = ["H","H"]
+		self.products = ["H2"]
+		self.barrier = 2
+		self.prefactor = 10
+		self.refPot = 2
+		self.netElectronTransfer = 0
+		self.temperature = 300
+		self.potential = 1.5
+		self.symFactor = 0.6
+		self.inpReactants = mock.Mock()
+		self.createTestObjs()
+
+	def createTestObjs(self):
+		args = [self.reactants, self.products, self.barrier, self.prefactor]
+		kwargs = {"refPot":self.refPot, "nElecTransfer":self.netElectronTransfer, "symFactor":self.symFactor}
+		self.testObjA = tCode.BetterReactionTemplate(*args, **kwargs)
+
+	def _getReactionRate(self):
+		return self.testObjA.getReactionRate( self.inpReactants, self.temperature, self.potential)
+
+	@mock.patch("simple_reactions_lib.core.core_classes.BetterReactionTemplate._getReactantConcRateFactor")
+	@mock.patch("simple_reactions_lib.core.core_classes.BetterReactionTemplate._getk0")
+	def testGetReactionRate_Potential(self, mockGetk0, mockGetConcFactor):
+		k0Val = 3
+		concFactor = 4
+		mockGetk0.side_effect = lambda *args,**kwargs: k0Val
+		mockGetConcFactor.side_effect = lambda *args,**kwargs: concFactor
+
+		expTotal = k0Val * concFactor
+		actTotal = self._getReactionRate()
+
+		mockGetk0.assert_called_with( self.temperature )
+		mockGetConcFactor.assert_called_with( self.inpReactants ) 
+		self.assertAlmostEqual(expTotal, actTotal)
+
+	@mock.patch("simple_reactions_lib.core.core_classes.BetterReactionTemplate._getTafelFactor")
+	@mock.patch("simple_reactions_lib.core.core_classes.BetterReactionTemplate._getReactantConcRateFactor")
+	@mock.patch("simple_reactions_lib.core.core_classes.BetterReactionTemplate._getk0")
+	def testGetReactionRate_mockTafelFactor(self, mockGetk0, mockGetConcFactor, mockGetTafelFactor):
+		k0Val, concFactor, tafelFactor = 3, 4, 5
+		mockGetk0.side_effect = lambda *args,**kwargs: k0Val
+		mockGetConcFactor.side_effect = lambda *args,**kwargs: concFactor
+		mockGetTafelFactor.side_effect = lambda *args,**kwargs: tafelFactor
+
+		expTotal = k0Val*concFactor*tafelFactor
+		actTotal = self._getReactionRate()
+		self.assertAlmostEqual(expTotal, actTotal)
+
+	def testGetTafelFactorCathodicA(self):
+		self.netElectronTransfer = 1
+		self.potential = self.refPot - 0.5
+		self.createTestObjs()
+		rt = unitHelp.IDEAL_GAS_R_JOULES * self.temperature
+		faradOverRT = unitHelp.FARADAY_CONST / rt
+		potDiff = self.potential - self.refPot
+		expTafelFactor = math.exp( -1*(potDiff*self.symFactor*faradOverRT) )
+		actTafelFactor = self.testObjA._getTafelFactor( self.temperature, self.potential )
+		self.assertAlmostEqual(expTafelFactor, actTafelFactor)
+
+	def testGetTafelFactorAnodicA_2Electrons(self):
+		self.netElectronTransfer = -2
+		self.potential = self.refPot + 0.4
+		self.createTestObjs()
+
+		rt = unitHelp.IDEAL_GAS_R_JOULES * self.temperature
+		faradOverRT = unitHelp.FARADAY_CONST / rt
+		potDiff = self.potential - self.refPot
+		expTafelFactor = math.exp( 2*(potDiff*self.symFactor*faradOverRT) )
+		actTafelFactor = self.testObjA._getTafelFactor( self.temperature, self.potential )
+
+		self.assertAlmostEqual(expTafelFactor, actTafelFactor)
+
+
 
 
 
