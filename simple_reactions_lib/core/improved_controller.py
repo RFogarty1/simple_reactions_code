@@ -1,5 +1,8 @@
 
 import copy
+import itertools as it
+
+from . import core_classes as coreHelp
 
 class ReactionControllerBase():
 
@@ -101,12 +104,58 @@ class ReactionControllerImproved(ReactionControllerBase):
 		self.propagator.propagate(self.currentReactants, time, temperature=self.temperature, potential=self.potential)
 
 
+#TODO: We need to adapt this to work with vectors as the changes in reactant concentrations when given a step in essence.
+#Probably ~equivalent to merging it with the concChanges class really; since thats using an annoying 
+class ConcsPropagatorTemplate(ConcsPropagatorBase):
+	""" Job of this class is to take a list of current concentrations, and propagate it forward by a timestep; Modfying concentrations IN PLACE. See .propagate() for interface """
+
+	def __init__(self, rateCalculator, variableConcSpecies):
+		self.rateCalculator = rateCalculator
+		self.variableConcSpecies = variableConcSpecies
+
+	def propagate(self, inputReactants, timeStep, temperature=300, potential=0):
+		functToPropagate = self.getFunctToPropagate(inputReactants, temperature, potential)
+		startConcs = [x.conc for x in inputReactants if x.name in self.variableConcSpecies]
+		propagatedConcs = self._propagateVectorisedFunctionToNextTimeStep( startConcs, timeStep, functToPropagate )
+		
+		#Update input reactants in place
+		counter = 0
+		for reactant in inputReactants:
+			if reactant.name in self.variableConcSpecies:
+				reactant.conc = propagatedConcs[counter]
+				counter += 1
+
+	def getFunctToPropagate(self, inputReactants, temperature, potential):
+		""" Uses rate calculator to get f(step,startConcs)->[endConcs] where startConcs and endConcs are vectorised forms of the concentration of variable species """
+		
+		reactantOrder = [x.name for x in inputReactants if x.name in self.variableConcSpecies]
+		def _outFunct(time, startConcs):
+			#startConcs-> input reactants
+			inpReactants = copy.deepcopy(inputReactants)
+			for reactant in inpReactants:
+				if reactant.name in reactantOrder:
+					reactant.conc = startConcs[ reactantOrder.index(reactant.name) ]
+
+
+			#Get d[X]/dt at t=0
+			rateDict = self.rateCalculator.getRates(inpReactants, temperature=temperature, potential=potential)
+			initRates = [rateDict[key] for key in reactantOrder]
+
+			return initRates #Pretty sure we just need d[conc]/dt for the current time
+
+		return _outFunct
+
+	#THIS is the hook to try multiple different integrators as required
+	def _propagateVectorisedFunctionToNextTimeStep(self, startConcs, timeStep, vectorisedFunction):
+		raise NotImplementedError("")
+
 
 #TODO: Could likely just merge this with ConcChangesFinderStandard and add a .propagte to THAT class...
 #Not sure theres ever going to be much varying configuration on this class?
 class ConcsPropagatorStandard(ConcsPropagatorBase):
+	""" DEPRECATED (will delete soon); use ConcsPropagatorTemplate and derivate classes """
 
-	def __init__(self, concChangesFinder, minConc=None, maxConc=None):
+	def __init__(self, concChangesFinder):
 		""" Initializer
 		
 		Args:
@@ -115,8 +164,6 @@ class ConcsPropagatorStandard(ConcsPropagatorBase):
 		"""
 		self.concChangesFinder = concChangesFinder
 		self.relTimeTolerance = 1e-4 #
-#		self.minConc = minConc
-#		self.maxConc = maxConc
 
 	#There may be some float error issues here....
 	def propagate(self, inputReactants, timeStep, temperature=300, potential=0):
@@ -141,13 +188,6 @@ class ConcsPropagatorStandard(ConcsPropagatorBase):
 			for reactant in reactants:
 				if reactant.name==key:
 					reactant.conc += concChanges[key]
-#					#Check conc has remained within limits if requested
-#					if (self.minConc is not None):
-#						if reactant.conc<self.minConc:
-#							reactant.conc = self.minConc
-#					if (self.maxConc is not None):
-#						if reactant.conc>self.
-
 
 class ConcChangesFinderStandard(ConcChangesFinderBase):
 

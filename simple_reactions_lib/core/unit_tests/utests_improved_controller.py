@@ -1,4 +1,5 @@
 
+import copy
 import itertools as it
 import unittest
 import unittest.mock as mock
@@ -43,6 +44,80 @@ class TestReactionControllerImproved(unittest.TestCase):
 
 		actReactants = self.testObjA.currentReactants
 		self.assertEqual(expReactants, actReactants)
+
+
+class TestPropagatorTemplate(unittest.TestCase):
+
+	def setUp(self):
+		self.mgStartConc, self.hStartConc, self.oStartConc = 3, 6, 5
+		self.mgRate, self.hRate, self.oRate = 2, 7, 4
+		self.step = 2
+		self.temp = 250
+		self.potential = 1
+
+		self.variableConcSpecies = ["Mg","O"]
+		self.createTestObjs()
+
+	def createTestObjs(self):
+		self.inputReactants = [ coreHelp.ChemSpeciesStd("Mg",self.mgStartConc),
+		                        coreHelp.ChemSpeciesStd("H", self.hStartConc),
+		                        coreHelp.ChemSpeciesStd("O", self.oStartConc) ]
+		self.mockRatesDictA = {"Mg":2, "H":3,"O":4} #Return even fixed conc vals; propagator will figure out which need using/discarding
+		self.mockRateCalculator = mock.Mock()
+		self.mockRateCalculator.getRates.side_effect = lambda *args,**kwargs: self.mockRatesDictA
+
+		self.testObjA = tCode.ConcsPropagatorTemplate(self.mockRateCalculator, self.variableConcSpecies)
+
+	def testGetFunctToPropagate(self):
+		funct = self.testObjA.getFunctToPropagate(self.inputReactants, self.temp, self.potential)
+		expOutVals = [ self.mgRate, self.oRate]
+		actOutVals = funct( self.step, [self.mgStartConc, self.oStartConc] )
+
+		self.mockRateCalculator.getRates.assert_called_with(self.inputReactants, temperature=self.temp, potential=self.potential)
+
+		for exp,act in it.zip_longest(expOutVals, actOutVals):
+			self.assertAlmostEqual(exp,act)
+
+	def testGetFunctToPropagate_useNonInitialStartConcs(self):
+		""" Check our implementation doesnt rely on the integrator only propagating from starting concentrations. """
+		funct = self.testObjA.getFunctToPropagate(self.inputReactants, self.temp, self.potential)
+
+		funct( self.step, [self.mgStartConc, self.oStartConc] )
+		newMgConc, newOConc = self.mgStartConc+2, self.oStartConc+2
+		actOutVals = funct( self.step, [newMgConc, newOConc] )
+		expOutVals = [ self.mgRate, self.oRate]
+		expInputReactants = [ coreHelp.ChemSpeciesStd("Mg", newMgConc),
+		                      coreHelp.ChemSpeciesStd("H", self.hStartConc),
+		                      coreHelp.ChemSpeciesStd("O", newOConc) ] 
+
+		self.mockRateCalculator.getRates.assert_called_with(expInputReactants, temperature=self.temp, potential=self.potential)
+		for exp,act in it.zip_longest(expOutVals, actOutVals):
+			self.assertAlmostEqual(exp,act)
+
+
+	@mock.patch("simple_reactions_lib.core.improved_controller.ConcsPropagatorTemplate._propagateVectorisedFunctionToNextTimeStep")
+	@mock.patch("simple_reactions_lib.core.improved_controller.ConcsPropagatorTemplate.getFunctToPropagate")
+	def testPropagateA(self, mockGetFunctToPropagate, mockPropagateToNextTimeStep):
+		#Setup
+		functToPropagate = mock.Mock()
+		newMgConc, newOConc = self.mgStartConc+10, self.oStartConc+12
+		mockGetFunctToPropagate.side_effect = lambda *args,**kwargs: functToPropagate
+#		functToPropagate.side_effect = lambda *ags,**kwargs: [newMgConc,newOConc]
+		startInpReactants = copy.deepcopy(self.inputReactants)
+
+		mockPropagateToNextTimeStep.side_effect = lambda *args,**kwargs: [newMgConc,newOConc]
+
+		expOutReactants = [ coreHelp.ChemSpeciesStd("Mg", newMgConc),
+		                    coreHelp.ChemSpeciesStd("H" , self.hStartConc),
+		                    coreHelp.ChemSpeciesStd("O" , newOConc) ]
+
+		self.testObjA.propagate( self.inputReactants, self.step, temperature=self.temp, potential=self.potential)
+
+		
+		mockGetFunctToPropagate.assert_called_with(self.inputReactants, self.temp, self.potential)
+		mockPropagateToNextTimeStep.assert_called_with([self.mgStartConc, self.oStartConc],self.step, functToPropagate)
+		self.assertEqual(expOutReactants, self.inputReactants) #self.inputReactants SHOULD have been updated with new concs
+	
 
 
 class TestPropagatorStandard(unittest.TestCase):
