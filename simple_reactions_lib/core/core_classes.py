@@ -106,7 +106,7 @@ class ChemReactionTemplate(ChemReactionBase):
 			assert len(inpConcs)<2
 			if len(inpConcs)==1:
 				outFactor *= inpConcs[0]
-
+		
 		return outFactor
 
 

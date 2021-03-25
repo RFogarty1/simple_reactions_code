@@ -93,10 +93,10 @@ class TestStandardReactionTemplate(unittest.TestCase):
 		self.assertEqual(expDict, actDict)
 
 	def testGetReactantConcFactor(self):
-		reactants = ["A","B"]
-		concs = [2,3]
+		reactants = ["A","B", "X"]
+		concs = [2,3, 1]
 		self.testObjA.reactants = reactants
-		reactantA, reactantB = [tCode.ChemSpeciesStd(name,conc) for name,conc in zip(reactants,concs)]
+		reactantA, reactantB, product = [tCode.ChemSpeciesStd(name,conc) for name,conc in zip(reactants,concs)]
 		expFactor = 2*3
 		actFactor = self.testObjA._getReactantConcRateFactor([reactantA,reactantB])
 		self.assertEqual(expFactor,actFactor)

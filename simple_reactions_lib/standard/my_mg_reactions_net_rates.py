@@ -28,8 +28,8 @@ class StandardNetReactionTemplate(coreObjs.NetReactionTemplate):
 	
 	def _createBackwardReaction(self, forwardBarrier, prefactor, reactionEnergy, u0, symFactorForward):
 		barrier = forwardBarrier - reactionEnergy
-		args = [self.reactants, self.products, barrier, prefactor]
-		kwargs = {"refPot":u0, "symFactor":1-symFactorForward, "nElecTransfer":self.nElecTransfer}
+		args = [self.products, self.reactants, barrier, prefactor]
+		kwargs = {"refPot":u0, "symFactor":1-symFactorForward, "nElecTransfer":-1*self.nElecTransfer}
 		self.backwardReaction = coreObjs.BetterReactionTemplate(*args, **kwargs)
 
 	@property
@@ -71,7 +71,7 @@ class WaterAssistReaction_twoElectronXferNet(StandardNetReactionTemplate):
 
 	@property
 	def nElecTransfer(self):
-		return -2
+		return 2
 
 
 class OHAssistedDissolutionReaction_twoElectronXferNet(StandardNetReactionTemplate):
@@ -86,7 +86,7 @@ class OHAssistedDissolutionReaction_twoElectronXferNet(StandardNetReactionTempla
 
 	@property
 	def nElecTransfer(self):
-		return -2
+		return 2
 
 
 class VolmerReactionNet(StandardNetReactionTemplate):
@@ -116,7 +116,7 @@ class Heyrovsky_waterAssistedNet(StandardNetReactionTemplate):
 
 	@property
 	def nElecTransfer(self):
-		return 1
+		return -1
 
 
 class HydrogenBulkDiffusionNet(StandardNetReactionTemplate):
@@ -134,6 +134,19 @@ class HydrogenBulkDiffusionNet(StandardNetReactionTemplate):
 		return 0
 
 
+class CathodicOHDesorption(StandardNetReactionTemplate):
+
+	@property
+	def reactants(self):
+		return ["oh_ads"]
+
+	@property
+	def products(self):
+		return ["free", "oh-"]
+
+	@property
+	def nElecTransfer(self):
+		return -1
 
 
 

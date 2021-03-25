@@ -31,9 +31,30 @@ class ConcsPropagator_DOP853(contrHelp.ConcsPropagatorTemplate):
 
 class ConcsPropagator_Radau(contrHelp.ConcsPropagatorTemplate):
 
+	def __init__(self, rateCalculator, variableConcSpecies, solverOptions=None):
+		self.rateCalculator = rateCalculator
+		self.variableConcSpecies = variableConcSpecies
+		self.solverOptions = dict() if solverOptions is None else solverOptions
+
 	def _propagateVectorisedFunctionToNextTimeStep(self, startConcs, timeStep, vectorisedFunction):
 		t0,tEnd = 0,timeStep
-		outObj = integrateHelp.solve_ivp(vectorisedFunction, [t0,tEnd], startConcs, method="Radau")
+		outObj = integrateHelp.solve_ivp(vectorisedFunction, [t0,tEnd], startConcs, method="Radau", **self.solverOptions)
+		outVals = [ y[-1] for y in outObj.y ]
+		assert (abs(outObj.t[-1]-timeStep)/timeStep)<0.01
+
+		return outVals
+
+
+class ConcsPropagator_BDF(contrHelp.ConcsPropagatorTemplate):
+
+	def __init__(self, rateCalculator, variableConcSpecies, solverOptions=None):
+		self.rateCalculator = rateCalculator
+		self.variableConcSpecies = variableConcSpecies
+		self.solverOptions = dict() if solverOptions is None else solverOptions
+
+	def _propagateVectorisedFunctionToNextTimeStep(self, startConcs, timeStep, vectorisedFunction):
+		t0,tEnd = 0,timeStep
+		outObj = integrateHelp.solve_ivp(vectorisedFunction, [t0,tEnd], startConcs, method="BDF", **self.solverOptions)
 		outVals = [ y[-1] for y in outObj.y ]
 		assert (abs(outObj.t[-1]-timeStep)/timeStep)<0.01
 
