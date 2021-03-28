@@ -82,7 +82,7 @@ class OHAssistedDissolutionReaction_twoElectronXferNet(StandardNetReactionTempla
 
 	@property
 	def products(self):
-		return ["free"]
+		return ["free", "mg2+"]
 
 	@property
 	def nElecTransfer(self):
